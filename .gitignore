@@ -12,11 +12,8 @@ venv/
 .env
 .env.*
 
-# Generated datasets and SQLite database
+# Generated raw datasets
 data/raw/
-data/clean/
-data/instamart.db
-data/*.db
 
 # Jupyter
 .ipynb_checkpoints/
