@@ -116,7 +116,7 @@ Instamart_Copilot/
 
 - Standardized city names by trimming whitespace and applying title case.
 - Standardized gender values to `male`, `female`, or `unknown`.
-- Treated ages outside the 10–100 range as invalid and set them to missing.
+- Treated ages outside the 10 to 100 range as invalid and set them to missing.
 - Imputed missing ages using the median age within each city.
 - Converted signup dates to datetime format.
 
@@ -132,8 +132,7 @@ Instamart_Copilot/
 - Converted order amounts to numeric values and treated invalid amounts as missing.
 - Replaced missing order amounts using product price, quantity, and discount:
 
-  `price_inr × quantity × (1 − discount_pct / 100)`
-
+  price_inr * quantity * (1 - discount_pct / 100)
 - Treated negative delivery times as missing.
 - Imputed missing delivery times for completed orders using the median for the corresponding product category.
 - Kept delivery times missing for cancelled orders.
