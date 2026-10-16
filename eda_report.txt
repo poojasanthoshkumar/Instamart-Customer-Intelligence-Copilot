@@ -1,0 +1,11 @@
+# Exploratory Data Analysis — Instamart
+
+The dataset contains 1,200 customers, 40 products, and 12,309 unique orders after removing 119 exact duplicate records and retaining the latest record per order ID. The cleaned orders comprise 11,110 completed orders and 1,199 cancelled orders.
+
+Completed orders generated total revenue of **INR 2,998,668.80**. The mean order amount was INR 269.91, whereas the median was INR 135.00. Positive skewness (4.6088) indicates that most orders have relatively low values, while a smaller number of high-value orders increase the mean. Using the 1.5 × IQR rule, 897 orders were classified as upper outliers above INR 645.30; no lower outliers were detected.
+
+Revenue differed across cities, with Hyderabad recording the highest total (INR 528,589.90), followed by Bengaluru (INR 523,643.40). Bengaluru had the highest revenue in the Electronics category at INR 233,909.45.
+
+The strongest absolute correlation among the examined variables was between order amount and discount percentage (r = −0.0951), followed by order amount and quantity (r = 0.0873). Both relationships were weak, indicating limited linear association. These correlations do not establish causation.
+
+The pandas pivot-table total exactly matched the SQL revenue total, providing an independent consistency check.
