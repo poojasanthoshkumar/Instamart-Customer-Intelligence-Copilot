@@ -1,6 +1,6 @@
 Instamart Customer Intelligence & Support Copilot
 
-1. Project Overview
+**1. Project Overview**
 
 The Instamart Customer Intelligence & Support Copilot is a reproducible data analytics and machine-learning project built using Python, pandas, NumPy, SQLite, and scikit-learn. It establishes a cleaned data foundation, analyses customer purchasing behaviour, identifies customer segments, and predicts customer lapse risk.
 
@@ -16,7 +16,7 @@ Part D — Policy RAG and Refund Agent: Policy retrieval and refund-support auto
 
 The supplied generate_data.py and mock_llm.py files are retained unchanged.
 
-2. Technology Stack
+**2. Technology Stack**
 
 Python 3.11 or later
 
