@@ -577,3 +577,109 @@ The retention list should be validated through prospective evaluation before ope
 
 Part B implements RFM analysis, K-Means segmentation, lapse cohort construction, cross-validated model selection, training-only oversampling, feature interpretation, saved-model checks, and retention prioritisation. The key outputs are stored under outputs/.
 
+
+## 7. Part C — Support-Ticket Triage
+
+### 7.1 Objective and input validation
+
+Part C implements a privacy-aware support-ticket triage pipeline using the supplied `mock_llm.py` interface. It classifies eligible tickets into billing, delivery, technical, or fraud categories, validates model responses, tracks token usage, and routes tickets to the appropriate support destination.
+
+The input dataset contains 164 tickets. Empty or whitespace-only ticket texts are assigned `skipped_empty`, while tickets exceeding the 400-token input threshold are assigned `flagged_long`. These checks occur before any model call.
+
+| Input status | Tickets |
+|---|---:|
+| Eligible for classification | 156 |
+| Empty tickets skipped | 4 |
+| Overlength tickets flagged | 4 |
+| Total | 164 |
+
+### 7.2 PII masking and privacy safeguards
+
+Before classification, the pipeline masks email addresses, ten-digit Indian mobile numbers, and order identifiers using the placeholders `[EMAIL]`, `[PHONE]`, and `[ORDER_ID]`, respectively. The regular expressions are applied in the prescribed order.
+
+| PII type | Substitutions |
+|---|---:|
+| Email addresses | 55 |
+| Phone numbers | 91 |
+| Order identifiers | 132 |
+| Total substitutions | 278 |
+
+Validation detected zero remaining matches for the configured PII patterns after redaction. The model's user message contains only the redacted ticket text; customer identifiers, original ticket text, and other metadata are not added to that message.
+
+The input audit is saved as `outputs/triage_input_audit.csv`.
+
+### 7.3 Classification prompts and response validation
+
+Two prompt strategies were evaluated using the same deterministic mock model:
+
+- **Zero-shot classification:** Provides category definitions and the required JSON response schema without examples.
+- **Few-shot classification:** Uses the same instructions and schema, supplemented by labelled examples covering fraud, billing, and technical issues.
+
+Responses are parsed as JSON and accepted as `classified_json` when the category belongs to the allowed set. If JSON parsing fails, a regular-expression fallback accepts a response as `classified_keyword` only when exactly one allowed category word is found. Unsupported categories, including `shipping`, and other unparseable responses are assigned `flagged_invalid_output` for human review.
+
+Transient model errors are retried up to three times per ticket, with exponential backoff and jitter. Retry events are logged. The supplied `mock_llm.py` file remains unchanged.
+
+### 7.4 Evaluation results
+
+Both full evaluation runs processed 164 records, including the eight tickets excluded by the input guardrails. Classification metrics are calculated only for the 147 tickets receiving valid category predictions.
+
+| Metric | Zero-shot | Few-shot |
+|---|---:|---:|
+| JSON classifications | 135 | 135 |
+| Keyword-fallback classifications | 12 | 12 |
+| Invalid outputs | 9 | 9 |
+| Validly classified tickets | 147 | 147 |
+| Correct classifications | 126 | 147 |
+| Accuracy among classified tickets | 85.71% | 100.00% |
+| Total response tokens | 12,364 | 20,944 |
+| Tokens per classified ticket | 84.11 | 142.48 |
+| Transient errors recovered | 19 | 19 |
+
+The zero-shot confusion matrix showed that the errors were concentrated in fraud and technical tickets predicted as billing. The few-shot prompt achieved perfect accuracy on the classified subset under the mock model's deterministic keyword rules. This improvement came with higher token consumption because the system prompt included examples.
+
+These findings describe performance on the supplied synthetic evaluation environment. They should not be interpreted as a guarantee of accuracy on real-world customer tickets.
+
+### 7.5 Token-budget demonstration
+
+A separate zero-shot run used a token budget of 6,000. Before each model call, the pipeline checked whether accumulated response-token usage had reached the budget. Once the threshold was reached, remaining eligible tickets were assigned `budget_exhausted` and routed for human review.
+
+The run classified 72 tickets, used 6,038 response tokens, and routed 80 tickets to human review because the budget was exhausted. The final permitted response can take the total above the threshold because the check occurs before the call.
+
+Output: `outputs/triage_budget_demo.csv`.
+
+The budget demonstration records the mock model's reported response-token usage. It does not represent a monetary cost estimate for a hosted language model.
+
+### 7.6 Final routing and priority rules
+
+The final output uses the few-shot prompt with a 100,000-token budget and applies the following rules in order:
+
+1. Tickets with `skipped_empty`, `flagged_long`, `flagged_invalid_output`, or `budget_exhausted` status are routed to `human_review` with `NORMAL` priority and no category.
+2. Validly classified fraud tickets are routed to `security_team` with `HIGH` priority.
+3. Other validly classified tickets belonging to premium customers are routed to `premium_desk` with `HIGH` priority.
+4. All remaining validly classified tickets are routed to `support_queue` with `NORMAL` priority.
+
+Customer segments are joined using `customer_id` from `outputs/customer_segments.csv`. Missing segment records are treated as non-premium.
+
+The final output contains 164 unique ticket records.
+
+| Route | Tickets |
+|---|---:|
+| Support queue | 102 |
+| Security team | 34 |
+| Premium desk | 11 |
+| Human review | 17 |
+| Total | 164 |
+
+Output: `outputs/triage_results.csv`.
+
+The output contains `ticket_id`, `customer_id`, `status`, `category`, `segment_name`, `priority`, `route`, and `tokens_used`.
+
+### 7.7 Human review and limitations
+
+Human review is required for empty tickets, overlength tickets, invalid model responses, and tickets for which the token budget prevents classification. These records are not assigned a predicted category. Valid classifications are routed according to the fraud and premium-customer rules.
+
+The pipeline uses a deterministic mock LLM rather than a production model. Its accuracy, response patterns, retry behaviour, and token counts are specific to the supplied implementation. PII checks cover the configured regular expressions and do not guarantee detection of every possible form of sensitive information. A production deployment would require broader privacy validation, human-reviewed evaluation data, monitoring, and testing across real customer language.
+
+### 7.8 Part C completion
+
+Part C implements PII redaction, input guardrails, zero-shot and few-shot classification, retry handling, response validation, token-budget enforcement, evaluation, and customer-aware routing. The required final and budget-demonstration CSV outputs are generated under `outputs/`. The supplied mock model remains unchanged.
