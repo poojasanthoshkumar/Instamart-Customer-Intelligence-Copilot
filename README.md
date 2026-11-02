@@ -36,10 +36,21 @@ Git and GitHub
 
 3. Project Structure
 
+3. Project Structure
+
 Instamart_Copilot/
 ├── data/
 │   ├── raw/
+│   │   ├── customers.csv
+│   │   ├── products.csv
+│   │   ├── orders.csv
+│   │   ├── tickets.csv
+│   │   ├── policy_eval.csv
+│   │   └── agent_scenarios.csv
 │   ├── clean/
+│   │   ├── customers.csv
+│   │   ├── products.csv
+│   │   └── orders.csv
 │   ├── policies/
 │   │   ├── delivery_policy.txt
 │   │   ├── escalation_policy.txt
@@ -58,8 +69,9 @@ Instamart_Copilot/
 │       ├── rag_pipeline.py
 │       └── refund_agent.py
 ├── outputs/
-│   ├── Part A and Part B analytical outputs
-│   ├── Part C support-ticket outputs
+│   ├── Part A analytical outputs
+│   ├── Part B analytical outputs and models
+│   ├── Part C triage outputs
 │   └── part_d/
 │       └── policy_chunks.json
 ├── generate_data.py
@@ -752,9 +764,49 @@ The implementation uses a deterministic mock LLM rather than a production langua
 Refund calculations, refund issuance, and human escalation are simulated. No actual payment transaction or database refund update is performed.
 
 The retrieval evaluation covers a limited set of predefined queries. A production implementation would require a larger human-reviewed evaluation dataset, stronger policy validation, security testing, monitoring, and integration with authorised refund systems.
-
+The refund agent uses predefined simulation rules: requests for orders delivered within 45 minutes receive a zero refund calculation, while refund amounts exceeding INR 1,000 are routed for simulated human escalation. These thresholds are experimental rules defined for this project and should not be interpreted as official Instamart refund criteria.
 ### 8.7 Part D Completion
 
 Part D implements policy processing, TF-IDF-based retrieval, RAG response generation, SQLite-based order lookup, tool-assisted refund handling, and evaluation.
 
 The policy evaluation achieved 14/14 passed queries, while the refund-agent evaluation achieved 7/7 passed scenarios within the supplied deterministic mock environment.
+8.8 Running Part D
+
+Run the following commands from the project root directory with the virtual environment activated.
+
+1. Process the refund policy
+
+python .\src\part_d\policy_processor.py
+
+Processes the refund policy and generates 11 policy chunks in "outputs/part_d/policy_chunks.json".
+
+2. Evaluate policy retrieval
+
+python .\src\part_d\evaluate_policy.py
+
+Evaluates policy retrieval using 14 predefined queries.
+
+3. Run the RAG pipeline
+
+python .\src\part_d\rag_pipeline.py
+
+Retrieves relevant policy information and generates a response using the mock language model.
+
+4. Run the refund agent
+
+python .\src\part_d\refund_agent.py
+
+Demonstrates order retrieval, policy search, refund calculation and simulated refund processing.
+
+5. Evaluate the refund agent
+
+python .\src\part_d\evaluate_agent.py
+
+Evaluates the refund agent using up to seven predefined test scenarios.
+
+Execution requirements:
+
+- Activate the Python virtual environment.
+- Ensure "data/instamart.db" is available.
+- Ensure "data/policies/refund_policy.txt" is available.
+- Run "policy_processor.py" first to generate the policy chunks required by the remaining scripts.
