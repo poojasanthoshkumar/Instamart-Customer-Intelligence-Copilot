@@ -34,55 +34,40 @@ Git and GitHub
 
 3. Project Structure
 
+3. Project Structure
+
 Instamart_Copilot/
 ├── data/
 │   ├── raw/
 │   ├── clean/
-│   │   ├── customers.csv
-│   │   ├── products.csv
-│   │   └── orders.csv
+│   ├── policies/
+│   │   ├── delivery_policy.txt
+│   │   ├── escalation_policy.txt
+│   │   ├── payment_policy.txt
+│   │   ├── privacy_policy.txt
+│   │   └── refund_policy.txt
 │   └── instamart.db
 ├── sql/
 │   └── queries.sql
+├── src/
+│   └── part_d/
+│       ├── evaluate_agent.py
+│       ├── evaluate_policy.py
+│       ├── policy_processor.py
+│       ├── policy_retriever.py
+│       ├── rag_pipeline.py
+│       └── refund_agent.py
 ├── outputs/
-│   ├── customer_segments.csv
-│   ├── kmeans_evaluation.csv
-│   ├── lapse_dataset.csv
-│   ├── lapse_model.joblib
-│   ├── lapse_model_comparison.json
-│   ├── logistic_oversampling_comparison.csv
-│   ├── logistic_regression_coefficients.csv
-│   ├── pca_coordinates.csv
-│   ├── random_forest_feature_importance.csv
-│   ├── retention_list.csv
-│   ├── rfm_scaled.csv
-│   ├── rfm_table.csv
-│   └── segment_profiles.csv
+│   ├── Part A and Part B analytical outputs
+│   ├── Part C support-ticket outputs
+│   └── part_d/
+│       └── policy_chunks.json
 ├── generate_data.py
 ├── mock_llm.py
-├── audit_data.py
-├── clean_customers.py
-├── clean_products.py
-├── clean_orders.py
-├── build_database.py
-├── validate_database.py
-├── run_sql_queries.py
-├── pandas_analysis.py
-├── build_rfm.py
-├── cluster_customers.py
-├── create_segments.py
-├── build_lapse_dataset.py
-├── train_lapse_model.py
-├── oversample_lapse_model.py
-├── oversample_logistic_regression.py
-├── analyse_lapse_features.py
-├── check_scaler_mean.py
-├── finalize_lapse_outputs.py
-├── eda_report.txt
+├── Part A, B and C Python scripts
 ├── requirements.txt
 ├── .gitignore
 └── README.md
-
 The outputs/ directory contains generated results and trained model artefacts. Some intermediate or additional output files may not be listed in this overview.
 
 4. Setup and Reproduction
@@ -683,3 +668,93 @@ The pipeline uses a deterministic mock LLM rather than a production model. Its a
 ### 7.8 Part C completion
 
 Part C implements PII redaction, input guardrails, zero-shot and few-shot classification, retry handling, response validation, token-budget enforcement, evaluation, and customer-aware routing. The required final and budget-demonstration CSV outputs are generated under `outputs/`. The supplied mock model remains unchanged.
+## 8. Part D – Policy RAG and Refund Agent
+
+### 8.1 Objective
+
+Part D implements a policy-based retrieval-augmented generation (RAG) pipeline and a tool-assisted refund-support agent. The objective is to retrieve relevant policy information, generate policy-grounded responses, retrieve order information from the SQLite database, and simulate refund decisions.
+
+The implementation uses the supplied deterministic mock LLM and synthetic policy documents.
+
+### 8.2 Policy Processing and Retrieval
+
+The refund policy document is processed into smaller text chunks containing the policy title and individual sections. These chunks are stored in:
+
+`outputs/part_d/policy_chunks.json`
+
+A TF-IDF-based retrieval system identifies relevant policy sections using heading and content similarity. The retrieval score combines heading similarity (0.65) and content similarity (0.35).
+
+Query expansion is applied to improve retrieval for related terms such as damaged, missing, wrong, expired, duplicate, and eligibility.
+
+### 8.3 RAG Pipeline
+
+The RAG pipeline retrieves relevant policy chunks and supplies the retrieved context to the policy assistant.
+
+The assistant generates responses using the retrieved policy information. The implementation follows a retrieval-and-generation workflow:
+
+1. Receive a customer policy-related question.
+2. Retrieve relevant policy sections.
+3. Provide the retrieved context to the mock LLM.
+4. Generate a response based on the supplied context.
+
+The policy evaluation dataset contains 14 test queries.
+
+| Evaluation metric | Result |
+|---|---:|
+| Total evaluation queries | 14 |
+| Passed queries | 14 |
+| Failed queries | 0 |
+| Accuracy on selected queries | 100% |
+
+These results represent the selected synthetic evaluation queries and do not establish general performance on real customer questions.
+
+### 8.4 Refund-Support Agent
+
+The refund agent uses a tool-calling workflow to support order-related refund requests.
+
+The implemented tools include:
+
+- `get_order`: Retrieves order details from the SQLite database.
+- `search_policy`: Retrieves relevant policy information.
+- `calculate_refund`: Calculates the simulated refund amount.
+- `issue_refund`: Simulates issuing a refund.
+- `escalate_to_human`: Simulates escalation for human review.
+
+The agent checks the order ID, retrieves the order status, searches the policy, calculates the refund amount, and either simulates a refund or escalates the request.
+
+The refund workflow is evaluated using seven predefined scenarios.
+
+### 8.5 Refund-Agent Evaluation
+
+| Test scenario | Expected behaviour |
+|---|---|
+| Successful refund | Refund simulated |
+| Cancelled order | Refund denied |
+| Invalid order ID | Order not found |
+| Missing order ID | Additional information required |
+| Malformed order ID | Additional information required |
+| Delivery within 45 minutes | Refund denied |
+| High-value refund | Escalation to human |
+
+| Evaluation metric | Result |
+|---|---:|
+| Total test scenarios | 7 |
+| Passed scenarios | 7 |
+| Failed scenarios | 0 |
+| Scenario pass rate | 100% |
+
+The evaluation demonstrates that the agent follows the expected workflow for the seven predefined test scenarios.
+
+### 8.6 Limitations
+
+The implementation uses a deterministic mock LLM rather than a production language model. The policy documents and evaluation scenarios are synthetic and are not verified official Instamart policies.
+
+Refund calculations, refund issuance, and human escalation are simulated. No actual payment transaction or database refund update is performed.
+
+The retrieval evaluation covers a limited set of predefined queries. A production implementation would require a larger human-reviewed evaluation dataset, stronger policy validation, security testing, monitoring, and integration with authorised refund systems.
+
+### 8.7 Part D Completion
+
+Part D implements policy processing, TF-IDF-based retrieval, RAG response generation, SQLite-based order lookup, tool-assisted refund handling, and evaluation.
+
+The policy evaluation achieved 14/14 passed queries, while the refund-agent evaluation achieved 7/7 passed scenarios within the supplied deterministic mock environment.

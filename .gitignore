@@ -1,19 +1,15 @@
-
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
 *.pyo
 
-# Virtual environment
+# Virtual environments
 .venv/
 venv/
 
 # Environment variables and secrets
 .env
 .env.*
-
-# Generated raw datasets
-data/raw/
 
 # Jupyter
 .ipynb_checkpoints/

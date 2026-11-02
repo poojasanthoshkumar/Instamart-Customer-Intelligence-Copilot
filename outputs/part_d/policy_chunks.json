@@ -1,0 +1,68 @@
+[
+    {
+        "chunk_id": "POLICY_001",
+        "heading": "INSTAMART CUSTOMER REFUND AND CANCELLATION POLICY",
+        "content": "",
+        "text": "INSTAMART CUSTOMER REFUND AND CANCELLATION POLICY"
+    },
+    {
+        "chunk_id": "POLICY_002",
+        "heading": "1. DAMAGED PRODUCTS",
+        "content": "Customers are eligible to request a refund if a product is delivered in a damaged condition. Customers should provide a photograph of the damaged product as proof. Refund requests for damaged products must be submitted within 24 hours of delivery. The request will be verified before approval.",
+        "text": "1. DAMAGED PRODUCTS\nCustomers are eligible to request a refund if a product is delivered in a damaged condition. Customers should provide a photograph of the damaged product as proof. Refund requests for damaged products must be submitted within 24 hours of delivery. The request will be verified before approval."
+    },
+    {
+        "chunk_id": "POLICY_003",
+        "heading": "2. MISSING PRODUCTS",
+        "content": "If one or more products are missing from a delivered order, customers can request a refund for the missing items. The order details and purchased item list must be checked to confirm that the product was not delivered. Refunds will only be considered for verified missing items.",
+        "text": "2. MISSING PRODUCTS\nIf one or more products are missing from a delivered order, customers can request a refund for the missing items. The order details and purchased item list must be checked to confirm that the product was not delivered. Refunds will only be considered for verified missing items."
+    },
+    {
+        "chunk_id": "POLICY_004",
+        "heading": "3. WRONG PRODUCTS DELIVERED",
+        "content": "If a customer receives a product different from the one ordered, they can request a refund. Customers may be asked to provide a photograph of the received product and order details for verification. Once the incorrect delivery is confirmed, the refund request can be approved.",
+        "text": "3. WRONG PRODUCTS DELIVERED\nIf a customer receives a product different from the one ordered, they can request a refund. Customers may be asked to provide a photograph of the received product and order details for verification. Once the incorrect delivery is confirmed, the refund request can be approved."
+    },
+    {
+        "chunk_id": "POLICY_005",
+        "heading": "4. EXPIRED PRODUCTS",
+        "content": "Customers can request a refund if they receive products that are expired or past their expiry date. A photograph showing the product and its expiry date should be provided as supporting evidence. The request must be verified before processing the refund.",
+        "text": "4. EXPIRED PRODUCTS\nCustomers can request a refund if they receive products that are expired or past their expiry date. A photograph showing the product and its expiry date should be provided as supporting evidence. The request must be verified before processing the refund."
+    },
+    {
+        "chunk_id": "POLICY_006",
+        "heading": "5. REFUND ELIGIBILITY",
+        "content": "Refund eligibility depends on the reason for the complaint, order information and supporting evidence. Only valid and verified requests should be approved. Requests that do not meet the policy requirements should not be automatically approved.",
+        "text": "5. REFUND ELIGIBILITY\nRefund eligibility depends on the reason for the complaint, order information and supporting evidence. Only valid and verified requests should be approved. Requests that do not meet the policy requirements should not be automatically approved."
+    },
+    {
+        "chunk_id": "POLICY_007",
+        "heading": "6. REFUND PROCESSING",
+        "content": "Once a refund request is approved, the refund will be initiated through the original payment method wherever applicable. The time required for the refund to appear in the customer's account may vary depending on the payment provider and banking process.",
+        "text": "6. REFUND PROCESSING\nOnce a refund request is approved, the refund will be initiated through the original payment method wherever applicable. The time required for the refund to appear in the customer's account may vary depending on the payment provider and banking process."
+    },
+    {
+        "chunk_id": "POLICY_008",
+        "heading": "7. ORDER CANCELLATION",
+        "content": "Customers can request order cancellation before the order is dispatched. Once an order has been dispatched, cancellation may not be possible. Cancellation requests must be checked against the current order status before making a decision.",
+        "text": "7. ORDER CANCELLATION\nCustomers can request order cancellation before the order is dispatched. Once an order has been dispatched, cancellation may not be possible. Cancellation requests must be checked against the current order status before making a decision."
+    },
+    {
+        "chunk_id": "POLICY_009",
+        "heading": "8. DUPLICATE REFUND REQUESTS",
+        "content": "Multiple refund requests submitted for the same order and product must be identified. Duplicate requests should be reviewed to prevent repeated refunds for the same issue. A refund must not be processed more than once for the same eligible item.",
+        "text": "8. DUPLICATE REFUND REQUESTS\nMultiple refund requests submitted for the same order and product must be identified. Duplicate requests should be reviewed to prevent repeated refunds for the same issue. A refund must not be processed more than once for the same eligible item."
+    },
+    {
+        "chunk_id": "POLICY_010",
+        "heading": "9. MANUAL REVIEW AND ESCALATION",
+        "content": "Refund requests with insufficient information, conflicting order details, missing evidence or unclear eligibility must be escalated for manual review. The support agent must not make unsupported refund decisions.",
+        "text": "9. MANUAL REVIEW AND ESCALATION\nRefund requests with insufficient information, conflicting order details, missing evidence or unclear eligibility must be escalated for manual review. The support agent must not make unsupported refund decisions."
+    },
+    {
+        "chunk_id": "POLICY_011",
+        "heading": "10. CUSTOMER SUPPORT RESPONSE",
+        "content": "The customer support agent should provide a clear and polite explanation for every refund decision. Approved requests should include the refund status. Rejected requests should include the reason for rejection. Requests requiring further verification should be communicated as pending or escalated.",
+        "text": "10. CUSTOMER SUPPORT RESPONSE\nThe customer support agent should provide a clear and polite explanation for every refund decision. Approved requests should include the refund status. Rejected requests should include the reason for rejection. Requests requiring further verification should be communicated as pending or escalated."
+    }
+]
