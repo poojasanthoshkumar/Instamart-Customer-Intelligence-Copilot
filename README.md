@@ -680,111 +680,126 @@ The pipeline uses a deterministic mock LLM rather than a production model. Its a
 ### 7.8 Part C completion
 
 Part C implements PII redaction, input guardrails, zero-shot and few-shot classification, retry handling, response validation, token-budget enforcement, evaluation, and customer-aware routing. The required final and budget-demonstration CSV outputs are generated under `outputs/`. The supplied mock model remains unchanged.
-## 8. Part D – Policy RAG and Refund Agent
+###8. Part D - Policy RAG and Refund Agent
 
-### 8.1 Objective
+8.1 Objective
 
-Part D implements a policy-based retrieval-augmented generation (RAG) pipeline and a tool-assisted refund-support agent. The objective is to retrieve relevant policy information, generate policy-grounded responses, retrieve order information from the SQLite database, and simulate refund decisions.
+Part D implements a policy-based Retrieval-Augmented Generation (RAG) pipeline and a tool-assisted refund-support agent. The objective is to retrieve relevant policy information, generate policy-grounded responses, retrieve order information from the SQLite database, and simulate refund decisions.
 
 The implementation uses the supplied deterministic mock LLM and synthetic policy documents.
 
-### 8.2 Policy Processing and Retrieval
+8.2 Policy Processing and Retrieval
 
-The refund policy document is processed into smaller text chunks containing the policy title and individual sections. These chunks are stored in:
+The policy-processing module reads the five policy documents available in "data/policies/" and divides their contents into smaller text chunks containing policy titles and individual sections.
 
-`outputs/part_d/policy_chunks.json`
+The processed chunks are stored in:
+
+"outputs/part_d/policy_chunks.json"
 
 A TF-IDF-based retrieval system identifies relevant policy sections using heading and content similarity. The retrieval score combines heading similarity (0.65) and content similarity (0.35).
 
 Query expansion is applied to improve retrieval for related terms such as damaged, missing, wrong, expired, duplicate, and eligibility.
 
-### 8.3 RAG Pipeline
+The successful policy-processing run generated 5 policy chunks from the supplied policy documents.
+
+8.3 RAG Pipeline and Policy Evaluation
 
 The RAG pipeline retrieves relevant policy chunks and supplies the retrieved context to the policy assistant.
 
-The assistant generates responses using the retrieved policy information. The implementation follows a retrieval-and-generation workflow:
+The workflow consists of the following steps:
 
 1. Receive a customer policy-related question.
-2. Retrieve relevant policy sections.
-3. Provide the retrieved context to the mock LLM.
+2. Retrieve relevant policy sections using the TF-IDF retrieval system.
+3. Provide the retrieved policy context to the mock LLM.
 4. Generate a response based on the supplied context.
 
-The policy evaluation dataset contains 14 test queries.
+The policy evaluation dataset contains 14 predefined test queries.
 
-| Evaluation metric | Result |
-|---|---:|
-| Total evaluation queries | 14 |
-| Passed queries | 14 |
-| Failed queries | 0 |
-| Accuracy on selected queries | 100% |
+Evaluation metric| Result
+Total evaluation queries| 14
+Passed queries| 14
+Failed queries| 0
+Accuracy on selected queries| 100%
 
-These results represent the selected synthetic evaluation queries and do not establish general performance on real customer questions.
+All 14 predefined policy evaluation queries passed. These results represent performance on the selected synthetic evaluation queries and do not establish general performance on real customer questions.
 
-### 8.4 Refund-Support Agent
+Output files:
 
-The refund agent uses a tool-calling workflow to support order-related refund requests.
+- "outputs/part_d/policy_chunks.json"
+- "outputs/part_d/policy_evaluation_results.csv"
+
+8.4 Refund-Support Agent
+
+The refund-support agent uses a tool-calling workflow to handle order-related refund requests.
 
 The implemented tools include:
 
-- `get_order`: Retrieves order details from the SQLite database.
-- `search_policy`: Retrieves relevant policy information.
-- `calculate_refund`: Calculates the simulated refund amount.
-- `issue_refund`: Simulates issuing a refund.
-- `escalate_to_human`: Simulates escalation for human review.
+- "get_order": Retrieves order details from the SQLite database.
+- "search_policy": Retrieves relevant policy information.
+- "calculate_refund": Calculates the simulated refund amount.
+- "issue_refund": Simulates issuing a refund.
+- "escalate_to_human": Simulates escalation for human review.
 
-The agent checks the order ID, retrieves the order status, searches the policy, calculates the refund amount, and either simulates a refund or escalates the request.
+The agent checks the order ID, retrieves the order status, searches the relevant policy, calculates the refund amount, and either simulates a refund, denies the request, or escalates it for human review.
 
-The refund workflow is evaluated using seven predefined scenarios.
+A repeated-tool-call detection mechanism is also implemented to prevent the agent from entering an unnecessary tool-calling loop. If the same tool call is repeated, the agent returns a fallback response for manual support.
 
-### 8.5 Refund-Agent Evaluation
+8.5 Refund-Agent Evaluation
 
-| Test scenario | Expected behaviour |
-|---|---|
-| Successful refund | Refund simulated |
-| Cancelled order | Refund denied |
-| Invalid order ID | Order not found |
-| Missing order ID | Additional information required |
-| Malformed order ID | Additional information required |
-| Delivery within 45 minutes | Refund denied |
-| High-value refund | Escalation to human |
+The refund agent was evaluated using seven predefined scenarios from "data/raw/agent_scenarios.csv".
 
-| Evaluation metric | Result |
-|---|---:|
-| Total test scenarios | 7 |
-| Passed scenarios | 7 |
-| Failed scenarios | 0 |
-| Scenario pass rate | 100% |
+Scenario| Expected behaviour| Evaluation result
+S1| Successful refund| Refund simulated - INR 128.25
+S2| Successful refund| Refund simulated - INR 135.00
+S3| High-value refund| Escalated - INR 1,999.00
+S4| Delivery within 45 minutes| Refund denied
+S5| Cancelled order| Refund denied
+S6| Invalid order ID| Order not found
+S7| Repeated tool call| Fallback triggered
 
-The evaluation demonstrates that the agent follows the expected workflow for the seven predefined test scenarios.
+Evaluation metric| Result
+Total test scenarios| 7
+Passed scenarios| 7
+Failed scenarios| 0
+Scenario pass rate| 100%
 
-### 8.6 Limitations
+All seven predefined scenarios passed. The evaluation checks the agent's ability to retrieve order information, apply the implemented refund rules, handle invalid or ineligible requests, escalate high-value cases, and detect repeated tool calls.
+
+The detailed evaluation results are saved in:
+
+"outputs/part_d/agent_evaluation_results.csv"
+
+8.6 Limitations
 
 The implementation uses a deterministic mock LLM rather than a production language model. The policy documents and evaluation scenarios are synthetic and are not verified official Instamart policies.
 
 Refund calculations, refund issuance, and human escalation are simulated. No actual payment transaction or database refund update is performed.
 
 The retrieval evaluation covers a limited set of predefined queries. A production implementation would require a larger human-reviewed evaluation dataset, stronger policy validation, security testing, monitoring, and integration with authorised refund systems.
+
 The refund agent uses predefined simulation rules: requests for orders delivered within 45 minutes receive a zero refund calculation, while refund amounts exceeding INR 1,000 are routed for simulated human escalation. These thresholds are experimental rules defined for this project and should not be interpreted as official Instamart refund criteria.
-### 8.7 Part D Completion
 
-Part D implements policy processing, TF-IDF-based retrieval, RAG response generation, SQLite-based order lookup, tool-assisted refund handling, and evaluation.
+8.7 Part D Completion
 
-The policy evaluation achieved 14/14 passed queries, while the refund-agent evaluation achieved 7/7 passed scenarios within the supplied deterministic mock environment.
+Part D implements policy processing, TF-IDF-based retrieval, RAG response generation, SQLite-based order lookup, tool-assisted refund handling, repeated-tool-call detection, and evaluation.
+
+The policy evaluation achieved 14/14 passed queries, while the refund-agent evaluation achieved 7/7 passed scenarios, with a 100% pass rate in both evaluations within the supplied deterministic mock environment.
+
 8.8 Running Part D
 
-Run the following commands from the project root directory with the virtual environment activated.
+Run the following commands from the project root directory with the Python virtual environment activated.
 
-1. Process the refund policy
+1. Process the policy documents
 
 python .\src\part_d\policy_processor.py
 
-Processes the refund policy and generates 11 policy chunks in "outputs/part_d/policy_chunks.json".
+Processes the five policy documents and generates the policy chunks in "outputs/part_d/policy_chunks.json".
 
 2. Evaluate policy retrieval
 
 python .\src\part_d\evaluate_policy.py
 
-Evaluates policy retrieval using 14 predefined queries.
+Evaluates policy retrieval using 14 predefined queries and saves the results in "outputs/part_d/policy_evaluation_results.csv".
 
 3. Run the RAG pipeline
 
@@ -792,21 +807,22 @@ python .\src\part_d\rag_pipeline.py
 
 Retrieves relevant policy information and generates a response using the mock language model.
 
-4. Run the refund agent
+4. Run the refund-support agent
 
 python .\src\part_d\refund_agent.py
 
-Demonstrates order retrieval, policy search, refund calculation and simulated refund processing.
+Demonstrates order retrieval, policy search, refund calculation, simulated refund processing, and escalation handling.
 
 5. Evaluate the refund agent
 
 python .\src\part_d\evaluate_agent.py
 
-Evaluates the refund agent using up to seven predefined test scenarios.
+Evaluates the refund agent using seven predefined test scenarios and saves the results in "outputs/part_d/agent_evaluation_results.csv".
 
 Execution requirements:
 
 - Activate the Python virtual environment.
 - Ensure "data/instamart.db" is available.
-- Ensure "data/policies/refund_policy.txt" is available.
-- Run "policy_processor.py" first to generate the policy chunks required by the remaining scripts.
+- Ensure all five policy documents are available in "data/policies/".
+- Ensure "data/raw/policy_eval.csv" and "data/raw/agent_scenarios.csv" are available.
+- Run "policy_processor.py" before running the policy evaluation or RAG pipeline.

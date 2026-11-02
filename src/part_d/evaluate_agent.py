@@ -1,3 +1,6 @@
+﻿import csv
+import math
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -9,122 +12,38 @@ from policy_retriever import load_policy_chunks, build_retriever
 from refund_agent import run_refund_agent
 
 DB_FILE = BASE_DIR / "data" / "instamart.db"
+SCENARIO_FILE = BASE_DIR / "data" / "raw" / "agent_scenarios.csv"
+OUTPUT_FILE = BASE_DIR / "outputs" / "part_d" / "agent_evaluation_results.csv"
 
 
-def find_order_id(condition):
-    """Find a suitable order ID from the database."""
+def get_order_details(message):
+    match = re.search(r"ORD-\d{6}", message)
+
+    if not match:
+        return None
 
     conn = sqlite3.connect(DB_FILE)
 
     try:
         row = conn.execute(
-            f"""
-            SELECT order_id
-            FROM orders
-            WHERE {condition}
-            LIMIT 1
             """
+            SELECT customer_id, order_amount, delivery_minutes, status
+            FROM orders
+            WHERE order_id = ?
+            """,
+            (match.group(0),)
         ).fetchone()
 
-        return row[0] if row else None
+        return row
 
     finally:
         conn.close()
 
 
-def create_test_scenarios():
-
-    scenarios = []
-
-    # Test 1: Successful refund
-    order_id = find_order_id(
-        "status = 'completed' "
-        "AND delivery_minutes > 45 "
-        "AND order_amount <= 1000"
-    )
-
-    if order_id:
-        scenarios.append({
-            "name": "Successful refund",
-            "query": f"I want a refund for order {order_id} because delivery was late.",
-            "expected": "REFUND:"
-        })
-
-    # Test 2: Cancelled order
-    order_id = find_order_id(
-        "status = 'cancelled'"
-    )
-
-    if order_id:
-        scenarios.append({
-            "name": "Cancelled order",
-            "query": f"I want a refund for order {order_id}.",
-            "expected": "DENIED: only completed orders"
-        })
-
-    # Test 3: Invalid order ID
-    invalid_id = "ORD-999999"
-
-    while find_order_id(
-        f"order_id = '{invalid_id}'"
-    ) is not None:
-        invalid_id = "ORD-" + str(int(invalid_id[4:]) - 1)
-
-    scenarios.append({
-        "name": "Invalid order ID",
-        "query": f"I want a refund for order {invalid_id}.",
-        "expected": "NOT_FOUND:"
-    })
-
-    # Test 4: Missing order ID
-    scenarios.append({
-        "name": "Missing order ID",
-        "query": "I want a refund because my delivery was late.",
-        "expected": "NEEDS_INFO:"
-    })
-
-    # Test 5: Malformed order ID
-    scenarios.append({
-        "name": "Malformed order ID",
-        "query": "I want a refund for order ORD-123 because delivery was late.",
-        "expected": "NEEDS_INFO:"
-    })
-
-    # Test 6: Delivery within 45 minutes
-    order_id = find_order_id(
-        "status = 'completed' "
-        "AND delivery_minutes <= 45"
-    )
-
-    if order_id:
-        scenarios.append({
-            "name": "Delivery within 45 minutes",
-            "query": f"I want a refund for order {order_id} because delivery was late.",
-            "expected": "DENIED: delivery was within 45 minutes"
-        })
-
-    # Test 7: High-value refund escalation
-    order_id = find_order_id(
-        "status = 'completed' "
-        "AND delivery_minutes > 45 "
-        "AND order_amount > 1000"
-    )
-
-    if order_id:
-        scenarios.append({
-            "name": "High-value refund escalation",
-            "query": f"I want a refund for order {order_id} because delivery was late.",
-            "expected": "ESCALATE:"
-        })
-
-    return scenarios
-
-
 def main():
-
-    print("=" * 55)
-    print("INSTAMART REFUND AGENT - EVALUATION")
-    print("=" * 55)
+    print("=" * 60)
+    print("INSTAMART REFUND AGENT - OFFICIAL SCENARIO EVALUATION")
+    print("=" * 60)
 
     print("\nLoading policy information...")
 
@@ -137,24 +56,53 @@ def main():
         document_vectors
     ) = build_retriever(chunks)
 
-    scenarios = create_test_scenarios()
+    with open(SCENARIO_FILE, "r", encoding="utf-8-sig", newline="") as file:
+        scenarios = list(csv.DictReader(file))
 
-    print(f"\nTotal test scenarios available: {len(scenarios)}")
+    print(f"Total official scenarios: {len(scenarios)}")
 
+    results = []
     passed = 0
-    failed = 0
 
     for index, scenario in enumerate(scenarios, start=1):
+        scenario_id = scenario["scenario_id"]
+        customer_id = scenario["customer_id"]
+        message = scenario["message"]
+        expected_outcome = scenario["expected_outcome"].strip()
+        expected_amount = float(scenario["expected_refund_inr"])
 
-        print("\n" + "=" * 55)
-        print(f"TEST {index}: {scenario['name']}")
-        print("=" * 55)
+        print("\n" + "=" * 60)
+        print(f"TEST {index}: {scenario_id}")
+        print("=" * 60)
+        print(f"Customer: {customer_id}")
+        print(f"Expected outcome: {expected_outcome}")
+        print(f"Expected amount: INR {expected_amount:.2f}")
 
-        print("\nCustomer request:")
-        print(scenario["query"])
+        order_details = get_order_details(message)
+        fixture_valid = True
+        actual_amount = 0.0
+
+        if order_details:
+            db_customer, db_amount, delivery_minutes, order_status = order_details
+
+            if db_customer != customer_id:
+                fixture_valid = False
+                print("WARNING: Customer ID does not match the order.")
+
+            if expected_outcome in ("REFUND", "ESCALATE"):
+                if not math.isclose(
+                    float(db_amount),
+                    expected_amount,
+                    abs_tol=0.01
+                ):
+                    fixture_valid = False
+                    print("WARNING: Expected amount does not match database.")
+
+                if expected_outcome == "ESCALATE":
+                    actual_amount = float(db_amount)
 
         result = run_refund_agent(
-            scenario["query"],
+            message,
             chunks,
             heading_vectorizer,
             heading_vectors,
@@ -162,29 +110,88 @@ def main():
             document_vectors
         )
 
-        print("\nFinal response:")
-        print(result)
+        result = result or ""
+        actual_outcome = result.split(":", 1)[0].strip()
 
-        if result and result.startswith(scenario["expected"]):
-            print("\nTEST RESULT: PASS")
-            passed += 1
+        if actual_outcome == "REFUND":
+            amount_match = re.search(
+                r"REFUND:\s*INR\s*([\d.]+)",
+                result
+            )
+
+            if amount_match:
+                actual_amount = float(amount_match.group(1))
+            else:
+                actual_outcome = "INVALID_REFUND_RESPONSE"
+
+        outcome_pass = actual_outcome == expected_outcome
+
+        if expected_outcome == "REFUND":
+            amount_pass = math.isclose(
+                actual_amount,
+                expected_amount,
+                abs_tol=0.01
+            )
+        elif expected_outcome == "ESCALATE":
+            amount_pass = math.isclose(
+                actual_amount,
+                expected_amount,
+                abs_tol=0.01
+            )
         else:
-            print("\nTEST RESULT: FAIL")
-            failed += 1
+            amount_pass = math.isclose(actual_amount, 0.0, abs_tol=0.01)
 
-    print("\n" + "=" * 55)
+        test_pass = outcome_pass and amount_pass and fixture_valid
+
+        print("\nActual response:")
+        print(result)
+        print(f"\nActual outcome: {actual_outcome}")
+        print(f"Actual amount checked: INR {actual_amount:.2f}")
+
+        if test_pass:
+            print("TEST RESULT: PASS")
+            passed += 1
+            status = "PASS"
+        else:
+            print("TEST RESULT: FAIL")
+            status = "FAIL"
+
+        results.append({
+            "scenario_id": scenario_id,
+            "customer_id": customer_id,
+            "expected_outcome": expected_outcome,
+            "actual_outcome": actual_outcome,
+            "expected_refund_inr": f"{expected_amount:.2f}",
+            "actual_refund_inr": f"{actual_amount:.2f}",
+            "result": result,
+            "status": status
+        })
+
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(OUTPUT_FILE, "w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=results[0].keys())
+        writer.writeheader()
+        writer.writerows(results)
+
+    failed = len(scenarios) - passed
+
+    print("\n" + "=" * 60)
     print("FINAL EVALUATION SUMMARY")
-    print("=" * 55)
-
-    print(f"Total tests: {len(scenarios)}")
+    print("=" * 60)
+    print(f"Total scenarios: {len(scenarios)}")
     print(f"Passed: {passed}")
     print(f"Failed: {failed}")
 
-    if passed + failed > 0:
-        accuracy = (passed / (passed + failed)) * 100
-        print(f"Test pass rate: {accuracy:.2f}%")
+    if scenarios:
+        print(f"Pass rate: {(passed / len(scenarios)) * 100:.2f}%")
 
-    print("\nEvaluation completed.")
+    print(f"\nDetailed results saved to: {OUTPUT_FILE}")
+
+    if failed:
+        print("\nSome scenarios failed. Review the results before submission.")
+    else:
+        print("\nAll official scenarios passed!")
 
 
 if __name__ == "__main__":

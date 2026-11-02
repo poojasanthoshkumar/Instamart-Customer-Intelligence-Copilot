@@ -176,6 +176,7 @@ def run_refund_agent(
     ]
 
     max_steps = 10
+    seen_tool_calls = set()
 
     for step in range(max_steps):
 
@@ -202,6 +203,13 @@ def run_refund_agent(
         })
 
         for call in tool_calls:
+
+            signature = (call.name, json.dumps(call.arguments, sort_keys=True))
+
+            if signature in seen_tool_calls:
+                return "FALLBACK: repeated tool call detected; manual support required."
+
+            seen_tool_calls.add(signature)
 
             print(f"\nExecuting tool: {call.name}")
 

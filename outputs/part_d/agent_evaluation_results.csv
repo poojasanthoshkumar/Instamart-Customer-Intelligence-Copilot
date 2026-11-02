@@ -1,0 +1,8 @@
+scenario_id,customer_id,expected_outcome,actual_outcome,expected_refund_inr,actual_refund_inr,result,status
+S1,C0007,REFUND,REFUND,128.25,128.25,REFUND: INR 128.25 issued.,PASS
+S2,C0008,REFUND,REFUND,135.00,135.00,REFUND: INR 135.0 issued.,PASS
+S3,C0016,ESCALATE,ESCALATE,1999.00,1999.00,ESCALATE: refund above INR 1000 sent to a human lead.,PASS
+S4,C0001,DENIED,DENIED,0.00,0.00,DENIED: delivery was within 45 minutes.,PASS
+S5,C0003,DENIED,DENIED,0.00,0.00,DENIED: only completed orders can be refunded.,PASS
+S6,C0001,NOT_FOUND,NOT_FOUND,0.00,0.00,NOT_FOUND: no such order.,PASS
+S7,C0007,FALLBACK,FALLBACK,0.00,0.00,FALLBACK: repeated tool call detected; manual support required.,PASS

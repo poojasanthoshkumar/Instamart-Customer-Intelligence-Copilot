@@ -2,60 +2,62 @@ import re
 import json
 from pathlib import Path
 
-
-# Get the main project directory
 BASE_DIR = Path(__file__).resolve().parents[2]
-
-# Define file paths
-POLICY_FILE = BASE_DIR / "data" / "policies" / "refund_policy.txt"
+POLICY_DIR = BASE_DIR / "data" / "policies"
 OUTPUT_FILE = BASE_DIR / "outputs" / "part_d" / "policy_chunks.json"
 
 
 def load_policy(file_path):
-    """Read and clean the refund policy."""
+    """Read and clean a policy document."""
 
     if not file_path.exists():
         raise FileNotFoundError(f"Policy file not found: {file_path}")
 
     text = file_path.read_text(encoding="utf-8")
-
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{2,}", "\n", text)
 
     return text.strip()
 
 
-def split_policy_into_chunks(text):
-    """Split policy into individual sections."""
+def split_policy_into_chunks(text, source_file):
+    """Split numbered refund sections or retain other policies as one chunk."""
 
-    sections = re.split(r"\n(?=\d+\.\s)", text)
-
+    policy_name = Path(source_file).stem.upper()
     chunks = []
 
-    for index, section in enumerate(sections, start=1):
+    if policy_name == "REFUND_POLICY":
+        sections = re.split(r"(?m)(?=^\s*\d+\.\s+)", text)
+    else:
+        sections = [text]
 
+    for index, section in enumerate(sections, start=1):
         section = section.strip()
 
         if not section:
             continue
 
         lines = section.split("\n", 1)
-
         heading = lines[0].strip()
         content = lines[1].strip() if len(lines) > 1 else ""
 
+        # Give each policy its own unique chunk ID.
+        prefix = policy_name.replace("_POLICY", "")
+
         chunks.append({
-            "chunk_id": f"POLICY_{index:03d}",
+            "chunk_id": f"{prefix}_{index:03d}",
             "heading": heading,
             "content": content,
-            "text": section
+            "text": section,
+            "source_file": source_file,
+            "policy_type": prefix.lower()
         })
 
     return chunks
 
 
 def save_chunks(chunks, output_file):
-    """Save policy chunks as JSON."""
+    """Save all policy chunks as JSON."""
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -65,24 +67,46 @@ def save_chunks(chunks, output_file):
 
 def main():
 
-    print("Loading refund policy...")
+    print("Loading all policy documents...")
 
-    policy_text = load_policy(POLICY_FILE)
+    policy_files = sorted(POLICY_DIR.glob("*.txt"))
 
-    print("Splitting policy into chunks...")
+    if not policy_files:
+        raise FileNotFoundError(
+            f"No policy documents found in: {POLICY_DIR}"
+        )
 
-    chunks = split_policy_into_chunks(policy_text)
+    all_chunks = []
 
-    save_chunks(chunks, OUTPUT_FILE)
+    for policy_file in policy_files:
+        print(f"\nProcessing: {policy_file.name}")
 
-    print("\nPolicy processing completed successfully!")
-    print(f"Total chunks created: {len(chunks)}")
+        policy_text = load_policy(policy_file)
+
+        chunks = split_policy_into_chunks(
+            policy_text,
+            policy_file.name
+        )
+
+        all_chunks.extend(chunks)
+
+        print(f"Chunks created: {len(chunks)}")
+
+    save_chunks(all_chunks, OUTPUT_FILE)
+
+    print("\nAll policy documents processed successfully!")
+    print(f"Total policy documents: {len(policy_files)}")
+    print(f"Total chunks created: {len(all_chunks)}")
     print(f"Output saved to: {OUTPUT_FILE}")
 
     print("\nGenerated policy chunks:")
 
-    for chunk in chunks:
-        print(f"{chunk['chunk_id']}: {chunk['heading']}")
+    for chunk in all_chunks:
+        print(
+            f"{chunk['chunk_id']} | "
+            f"{chunk['source_file']} | "
+            f"{chunk['heading']}"
+        )
 
 
 if __name__ == "__main__":
