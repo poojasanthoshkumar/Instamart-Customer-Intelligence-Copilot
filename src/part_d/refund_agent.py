@@ -1,24 +1,32 @@
+
+"""refund_agent.py
+Offline policy-grounded Instamart refund agent.
+Compatible with the original mock_llm.py and two-value policy retriever.
+"""
+
 import json
 import sqlite3
 import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(BASE_DIR))
+
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 
 from mock_llm import chat
 from policy_retriever import (
     load_policy_chunks,
     build_retriever,
-    retrieve_policy
+    retrieve_policy,
 )
 
 DB_FILE = BASE_DIR / "data" / "instamart.db"
+MAX_STEPS = 10
 
 
-# 1. Retrieve order details from SQLite database
 def get_order(order_id):
-
+    """Retrieve an order from SQLite."""
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
 
@@ -26,11 +34,11 @@ def get_order(order_id):
         row = conn.execute(
             """
             SELECT order_id, customer_id, order_amount,
-                   delivery_minutes, status
+                   delivery_minutes, status, order_ts
             FROM orders
             WHERE order_id = ?
             """,
-            (order_id,)
+            (order_id,),
         ).fetchone()
 
         if row is None:
@@ -42,216 +50,228 @@ def get_order(order_id):
         conn.close()
 
 
-# 2. Search relevant refund policy
-def search_policy(
-    query,
-    chunks,
-    heading_vectorizer,
-    heading_vectors,
-    content_vectorizer,
-    document_vectors
-):
-
+def search_policy(query, chunks, vectorizer, document_vectors):
+    """Retrieve relevant policy sections."""
     results = retrieve_policy(
         query,
         chunks,
-        heading_vectorizer,
-        heading_vectors,
-        content_vectorizer,
+        vectorizer,
         document_vectors,
-        top_k=3
+        top_k=len(chunks),
     )
 
     return {
         "policy_sections": [
             {
-                "heading": item["heading"],
-                "content": item["content"]
+                "heading": item.get("heading", ""),
+                "content": item.get("text", ""),
+                "source": item.get("source", ""),
+                "chunk_id": item.get("chunk_id", ""),
             }
             for item in results
         ]
     }
 
 
-# 3. Calculate simulated refund
 def calculate_refund(order_amount, delivery_minutes):
+    """Calculate refund eligibility under the late-delivery policy."""
+    if delivery_minutes is None:
+        return {
+            "refund_inr": 0.0,
+            "reason": "Delivery time unavailable.",
+        }
 
-    if delivery_minutes is None or delivery_minutes <= 45:
-        refund_amount = 0
-    else:
-        refund_amount = float(order_amount)
+    if float(delivery_minutes) <= 45:
+        return {
+            "refund_inr": 0.0,
+            "reason": "Delivery completed within 45 minutes.",
+        }
 
-    return {"refund_inr": refund_amount}
+    return {
+        "refund_inr": round(float(order_amount), 2),
+        "reason": "Delivery exceeded 45 minutes.",
+    }
 
 
-# 4. Simulate refund processing
 def issue_refund(order_id, refund_inr):
-
+    """Simulate automatic refund processing."""
     return {
         "status": "simulated",
         "order_id": order_id,
-        "refund_inr": refund_inr
+        "refund_inr": round(float(refund_inr), 2),
+        "payment_method": "original payment method",
+        "credit_timeline": "within 5 working days",
     }
 
 
-# 5. Simulate escalation to human support
 def escalate_to_human(order_id, refund_inr):
-
+    """Simulate human approval for large refunds."""
     return {
         "status": "escalated",
         "order_id": order_id,
-        "refund_inr": refund_inr
+        "refund_inr": round(float(refund_inr), 2),
+        "reason": "Human support lead approval required.",
     }
 
 
-# 6. Execute agent tool calls
-def execute_tool(
-    name,
-    arguments,
-    chunks,
-    heading_vectorizer,
-    heading_vectors,
-    content_vectorizer,
-    document_vectors
-):
-
+def execute_tool(name, arguments, chunks, vectorizer, document_vectors):
+    """Execute an agent tool call."""
     if name == "get_order":
         return get_order(arguments["order_id"])
 
-    elif name == "search_policy":
+    if name == "search_policy":
         return search_policy(
             arguments["query"],
             chunks,
-            heading_vectorizer,
-            heading_vectors,
-            content_vectorizer,
-            document_vectors
+            vectorizer,
+            document_vectors,
         )
 
-    elif name == "calculate_refund":
+    if name == "calculate_refund":
         return calculate_refund(
             arguments["order_amount"],
-            arguments["delivery_minutes"]
+            arguments["delivery_minutes"],
         )
 
-    elif name == "issue_refund":
+    if name == "issue_refund":
         return issue_refund(
             arguments["order_id"],
-            arguments["refund_inr"]
+            arguments["refund_inr"],
         )
 
-    elif name == "escalate_to_human":
+    if name == "escalate_to_human":
         return escalate_to_human(
             arguments["order_id"],
-            arguments["refund_inr"]
+            arguments["refund_inr"],
         )
 
-    return {"error": "Unknown tool"}
+    return {"error": f"Unknown tool: {name}"}
 
 
-# 7. Main refund agent workflow
-def run_refund_agent(
-    customer_query,
-    chunks,
-    heading_vectorizer,
-    heading_vectors,
-    content_vectorizer,
-    document_vectors
-):
-
+def run_refund_agent(customer_query, chunks, vectorizer, document_vectors):
+    """Run the multi-step refund support workflow."""
     messages = [
         {
             "role": "system",
             "content": (
-                "You are an AGENT responsible for handling "
-                "customer refund requests. Use the available "
-                "tools to retrieve orders, search policies, "
-                "calculate refunds, and process or escalate requests."
-            )
+                "AGENT: You are the Instamart refund support agent. "
+                "Use the available tools to retrieve orders, retrieve "
+                "refund policies, calculate refunds and process or "
+                "escalate requests. Only completed orders are eligible. "
+                "Delivery above 45 minutes qualifies for a full refund. "
+                "Refunds above INR 1000 require human approval. "
+                "Refund processing is simulated, not a real transaction."
+            ),
         },
         {
             "role": "user",
-            "content": customer_query
-        }
+            "content": customer_query,
+        },
     ]
 
-    max_steps = 10
     seen_tool_calls = set()
+    escalation_result = None
 
-    for step in range(max_steps):
-
+    for step in range(MAX_STEPS):
         response = chat(messages)
+        choice = response.choices[0]
+        assistant_message = choice.message
 
-        assistant_message = response.choices[0].message
+        if choice.finish_reason != "tool_calls":
+            # Use the actual tool result to standardize escalation output.
+            # This avoids relying on the wording generated by the mock LLM.
+            if escalation_result is not None:
+                amount = escalation_result["refund_inr"]
+                return (
+                    f"ESCALATE: refund of INR {amount:.2f} "
+                    "sent to a human support lead for approval."
+                )
 
-        if response.choices[0].finish_reason != "tool_calls":
-            return assistant_message.content
+            return assistant_message.content or (
+                "FALLBACK: No final response generated."
+            )
 
-        tool_calls = assistant_message.tool_calls
+        tool_calls = assistant_message.tool_calls or []
 
-        messages.append({
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [
-                {
-                    "id": call.id,
-                    "name": call.name,
-                    "arguments": call.arguments
-                }
-                for call in tool_calls
-            ]
-        })
+        if not tool_calls:
+            return "FALLBACK: Empty tool-call response."
+
+        messages.append(
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": call.id,
+                        "name": call.name,
+                        "arguments": call.arguments,
+                    }
+                    for call in tool_calls
+                ],
+            }
+        )
 
         for call in tool_calls:
-
-            signature = (call.name, json.dumps(call.arguments, sort_keys=True))
+            signature = (
+                call.name,
+                json.dumps(call.arguments, sort_keys=True),
+            )
 
             if signature in seen_tool_calls:
-                return "FALLBACK: repeated tool call detected; manual support required."
+                return (
+                    "FALLBACK: Repeated tool call detected. "
+                    "Manual support required."
+                )
 
             seen_tool_calls.add(signature)
 
             print(f"\nExecuting tool: {call.name}")
 
-            result = execute_tool(
-                call.name,
-                call.arguments,
-                chunks,
-                heading_vectorizer,
-                heading_vectors,
-                content_vectorizer,
-                document_vectors
-            )
+            try:
+                result = execute_tool(
+                    call.name,
+                    call.arguments,
+                    chunks,
+                    vectorizer,
+                    document_vectors,
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                return f"FALLBACK: Tool execution error: {exc}"
 
             print("Tool result:", result)
 
-            messages.append({
-                "role": "tool",
-                "tool_call_id": call.id,
-                "name": call.name,
-                "content": json.dumps(result)
-            })
+            if (
+                call.name == "escalate_to_human"
+                and result.get("status") == "escalated"
+            ):
+                escalation_result = result
+
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "name": call.name,
+                    "content": json.dumps(result),
+                }
+            )
 
     return (
-        "ESCALATE: Maximum agent steps reached. "
+        "FALLBACK: Maximum agent steps reached. "
         "Manual review required."
     )
 
 
-# 8. Main program
 def main():
-
     print("Loading policy information...")
 
     chunks = load_policy_chunks()
 
-    (
-        heading_vectorizer,
-        heading_vectors,
-        content_vectorizer,
-        document_vectors
-    ) = build_retriever(chunks)
+    if not chunks:
+        raise RuntimeError("No policy chunks found.")
 
+    vectorizer, document_vectors = build_retriever(chunks)
+
+    print(f"Policy chunks loaded: {len(chunks)}")
     print("Refund agent is ready.")
 
     customer_query = (
@@ -267,10 +287,8 @@ def main():
     result = run_refund_agent(
         customer_query,
         chunks,
-        heading_vectorizer,
-        heading_vectors,
-        content_vectorizer,
-        document_vectors
+        vectorizer,
+        document_vectors,
     )
 
     print("\nFinal agent response:")

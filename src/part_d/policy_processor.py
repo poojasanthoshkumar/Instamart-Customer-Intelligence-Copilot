@@ -1,68 +1,84 @@
-import re
+
 import json
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[2]
+
 POLICY_DIR = BASE_DIR / "data" / "policies"
 OUTPUT_FILE = BASE_DIR / "outputs" / "part_d" / "policy_chunks.json"
 
+CHUNK_SIZE = 40
+OVERLAP_WORDS = 10
+STRIDE = CHUNK_SIZE - OVERLAP_WORDS
+
 
 def load_policy(file_path):
-    """Read and clean a policy document."""
 
     if not file_path.exists():
-        raise FileNotFoundError(f"Policy file not found: {file_path}")
+        raise FileNotFoundError(
+            f"Policy file not found: {file_path}"
+        )
 
-    text = file_path.read_text(encoding="utf-8")
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{2,}", "\n", text)
+    text = file_path.read_text(encoding="utf-8-sig")
 
-    return text.strip()
+    return text.split()
 
 
-def split_policy_into_chunks(text, source_file):
-    """Split numbered refund sections or retain other policies as one chunk."""
+def split_policy_into_chunks(words, source_file):
+    """
+    Split policy text into 40-word chunks
+    with a 10-word overlap.
+    """
 
-    policy_name = Path(source_file).stem.upper()
     chunks = []
 
-    if policy_name == "REFUND_POLICY":
-        sections = re.split(r"(?m)(?=^\s*\d+\.\s+)", text)
-    else:
-        sections = [text]
+    policy_name = Path(source_file).stem.upper()
+    prefix = policy_name.replace("_POLICY", "")
 
-    for index, section in enumerate(sections, start=1):
-        section = section.strip()
+    start = 0
+    total_words = len(words)
 
-        if not section:
-            continue
+    while start < total_words:
 
-        lines = section.split("\n", 1)
-        heading = lines[0].strip()
-        content = lines[1].strip() if len(lines) > 1 else ""
+        end = min(start + CHUNK_SIZE, total_words)
 
-        # Give each policy its own unique chunk ID.
-        prefix = policy_name.replace("_POLICY", "")
+        chunk_words = words[start:end]
+        content = " ".join(chunk_words)
 
         chunks.append({
-            "chunk_id": f"{prefix}_{index:03d}",
-            "heading": heading,
+            "chunk_id": f"{prefix}_{len(chunks) + 1:03d}",
+            "heading": content[:100],
             "content": content,
-            "text": section,
+            "text": content,
             "source_file": source_file,
             "policy_type": prefix.lower()
         })
+
+        # Stop when the final word has been included.
+        if end >= total_words:
+            break
+
+        # Move forward by 30 words,
+        # retaining the previous 10 words as overlap.
+        start += STRIDE
 
     return chunks
 
 
 def save_chunks(chunks, output_file):
-    """Save all policy chunks as JSON."""
 
-    output_file.parent.mkdir(parents=True, exist_ok=True)
+    output_file.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
     with open(output_file, "w", encoding="utf-8") as file:
-        json.dump(chunks, file, indent=4, ensure_ascii=False)
+        json.dump(
+            chunks,
+            file,
+            indent=4,
+            ensure_ascii=False
+        )
 
 
 def main():
@@ -79,34 +95,27 @@ def main():
     all_chunks = []
 
     for policy_file in policy_files:
+
         print(f"\nProcessing: {policy_file.name}")
 
-        policy_text = load_policy(policy_file)
+        words = load_policy(policy_file)
 
         chunks = split_policy_into_chunks(
-            policy_text,
+            words,
             policy_file.name
         )
 
         all_chunks.extend(chunks)
 
+        print(f"Total words: {len(words)}")
         print(f"Chunks created: {len(chunks)}")
 
     save_chunks(all_chunks, OUTPUT_FILE)
 
-    print("\nAll policy documents processed successfully!")
-    print(f"Total policy documents: {len(policy_files)}")
-    print(f"Total chunks created: {len(all_chunks)}")
-    print(f"Output saved to: {OUTPUT_FILE}")
-
-    print("\nGenerated policy chunks:")
-
-    for chunk in all_chunks:
-        print(
-            f"{chunk['chunk_id']} | "
-            f"{chunk['source_file']} | "
-            f"{chunk['heading']}"
-        )
+    print("\nPolicy processing completed.")
+    print(f"Total documents: {len(policy_files)}")
+    print(f"Total chunks: {len(all_chunks)}")
+    print(f"Saved to: {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":

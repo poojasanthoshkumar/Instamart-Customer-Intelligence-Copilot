@@ -1,3 +1,4 @@
+
 import json
 from pathlib import Path
 
@@ -6,6 +7,32 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 CHUNKS_FILE = BASE_DIR / "outputs" / "part_d" / "policy_chunks.json"
+
+# Expand customer language into terms used in company policies.
+QUERY_EXPANSIONS = {
+    "damaged": "defective wrong missing product damage complaint",
+    "defective": "damaged wrong missing product",
+    "wrong": "incorrect damaged missing product",
+    "missing": "wrong damaged product item",
+
+    "privacy": "personal information phone email masked address deleted",
+    "protected": "privacy personal information masked secure",
+    "personal": "privacy phone email address masked information",
+
+    "payment": "failed deducted money returned refund transaction",
+    "deducted": "payment failed money returned automatically 48 hours",
+    "placed": "payment failed order not created returned",
+
+    "escalate": "escalation ticket human agent unresolved complaint handoff",
+    "unresolved": "escalation cannot resolve ticket human agent",
+    "complaint": "ticket support issue escalation human agent",
+
+    "late": "delivery delivered delay 45 minutes refund",
+    "delivery": "late delivered minutes rider order",
+    "refund": "completed cancelled amount payment returned",
+
+    "cancelled": "canceled refund charged completed order"
+}
 
 
 def load_policy_chunks():
@@ -16,148 +43,103 @@ def load_policy_chunks():
         )
 
     with open(CHUNKS_FILE, "r", encoding="utf-8") as file:
-        return json.load(file)
+        chunks = json.load(file)
+
+    if not isinstance(chunks, list):
+        raise ValueError("Policy chunks must be a JSON list.")
+
+    return chunks
 
 
 def expand_query(query):
 
-    query_lower = query.lower()
+    words = query.lower().split()
+
     expanded_terms = [query]
 
-    if any(term in query_lower for term in [
-        "eligible", "eligibility", "qualify",
-        "verified", "verification", "valid"
-    ]):
-        expanded_terms.append(
-            "refund eligibility eligible valid verified "
-            "verification supporting evidence requirements"
-        )
+    for word in words:
+        clean_word = word.strip(".,?!:;")
 
-    if any(term in query_lower for term in [
-        "twice", "duplicate", "same refund",
-        "again", "repeated", "multiple"
-    ]):
-        expanded_terms.append(
-            "duplicate refund requests repeated same request "
-            "multiple refund twice"
-        )
-
-    if any(term in query_lower for term in [
-        "damaged", "broken", "defective"
-    ]):
-        expanded_terms.append(
-            "damaged product photograph evidence condition"
-        )
-
-    if any(term in query_lower for term in [
-        "missing", "absent", "not received"
-    ]):
-        expanded_terms.append(
-            "missing products order details items"
-        )
-
-    if any(term in query_lower for term in [
-        "wrong", "incorrect", "different product"
-    ]):
-        expanded_terms.append(
-            "wrong incorrect products delivered"
-        )
-
-    if any(term in query_lower for term in [
-        "expired", "expiry", "expiration"
-    ]):
-        expanded_terms.append(
-            "expired product expiry date photograph"
-        )
-
-    if any(term in query_lower for term in [
-        "unclear", "conflicting", "manual review",
-        "escalation", "escalate"
-    ]):
-        expanded_terms.append(
-            "manual review escalation unclear conflicting requests"
-        )
+        if clean_word in QUERY_EXPANSIONS:
+            expanded_terms.append(
+                QUERY_EXPANSIONS[clean_word]
+            )
 
     return " ".join(expanded_terms)
 
 
 def build_retriever(chunks):
+    """
+    Build the TF-IDF policy retrieval system.
+    """
 
-    headings = [chunk["heading"] for chunk in chunks]
-    documents = [chunk["text"] for chunk in chunks]
+    if not chunks:
+        raise ValueError("No policy chunks available.")
 
-    heading_vectorizer = TfidfVectorizer(
+    documents = [
+        chunk["text"]
+        for chunk in chunks
+    ]
+
+    vectorizer = TfidfVectorizer(
+        lowercase=True,
         stop_words="english",
         ngram_range=(1, 2),
         sublinear_tf=True
     )
 
-    content_vectorizer = TfidfVectorizer(
-        stop_words="english",
-        ngram_range=(1, 2),
-        sublinear_tf=True
-    )
+    document_vectors = vectorizer.fit_transform(documents)
 
-    heading_vectors = heading_vectorizer.fit_transform(headings)
-    document_vectors = content_vectorizer.fit_transform(documents)
-
-    return (
-        heading_vectorizer,
-        heading_vectors,
-        content_vectorizer,
-        document_vectors
-    )
+    return vectorizer, document_vectors
 
 
 def retrieve_policy(
     query,
     chunks,
-    heading_vectorizer,
-    heading_vectors,
-    content_vectorizer,
+    vectorizer,
     document_vectors,
-    top_k=3
+    top_k=3,
+    min_score=0.02
 ):
+    """
+    Retrieve relevant policy chunks using cosine similarity.
+    """
 
-    expanded_query = expand_query(query)
+    if not query.strip():
+        return []
 
-    query_heading_vector = heading_vectorizer.transform(
-        [expanded_query]
-    )
+    expanded = expand_query(query)
 
-    query_content_vector = content_vectorizer.transform(
-        [expanded_query]
-    )
+    query_vector = vectorizer.transform([expanded])
 
-    heading_scores = cosine_similarity(
-        query_heading_vector,
-        heading_vectors
-    ).flatten()
-
-    content_scores = cosine_similarity(
-        query_content_vector,
+    similarity_scores = cosine_similarity(
+        query_vector,
         document_vectors
     ).flatten()
 
-    combined_scores = (
-        0.65 * heading_scores +
-        0.35 * content_scores
-    )
-
-    ranked_indices = combined_scores.argsort()[::-1][:top_k]
+    ranked_indices = similarity_scores.argsort()[::-1]
 
     results = []
 
     for index in ranked_indices:
 
+        score = float(similarity_scores[index])
+
+        # Ignore unrelated and zero-similarity chunks.
+        if score < min_score:
+            continue
+
+        chunk = chunks[index]
+
         results.append({
-            "chunk_id": chunks[index]["chunk_id"],
-            "heading": chunks[index]["heading"],
-            "content": chunks[index]["text"],
-            "similarity_score": round(
-                float(combined_scores[index]), 4
-            )
+            "chunk_id": chunk["chunk_id"],
+            "source": chunk["source_file"],
+            "score": round(score, 4),
+            "text": chunk["text"]
         })
+
+        if len(results) >= top_k:
+            break
 
     return results
 
@@ -168,34 +150,31 @@ def main():
 
     chunks = load_policy_chunks()
 
-    print("Building improved TF-IDF retrieval system...")
+    print(f"Total chunks loaded: {len(chunks)}")
 
-    (
-        heading_vectorizer,
-        heading_vectors,
-        content_vectorizer,
-        document_vectors
-    ) = build_retriever(chunks)
+    print("\nBuilding TF-IDF retrieval system...")
 
-    query = "I received a damaged product. Can I get a refund?"
+    vectorizer, document_vectors = build_retriever(chunks)
+
+    query = input("\nEnter a customer query: ").strip()
 
     results = retrieve_policy(
         query,
         chunks,
-        heading_vectorizer,
-        heading_vectors,
-        content_vectorizer,
+        vectorizer,
         document_vectors,
         top_k=3
     )
 
+    print("\nRetrieved Policy Chunks")
+
     for result in results:
 
-        print("\n" + "=" * 50)
-        print("Policy ID:", result["chunk_id"])
-        print("Section:", result["heading"])
-        print("Similarity:", result["similarity_score"])
-        print("Policy:", result["content"])
+        print("\n" + "=" * 60)
+        print("Chunk ID:", result["chunk_id"])
+        print("Source:", result["source"])
+        print("Similarity:", result["score"])
+        print("Policy:", result["text"])
 
 
 if __name__ == "__main__":
