@@ -18,3 +18,11 @@ venv/
 .vscode/
 .DS_Store
 Thumbs.db
+# Python environment and cache
+.venv/
+__pycache__/
+*.py[cod]
+
+# Runtime agent state and logs
+state/
+outputs/*.jsonl
