@@ -26,3 +26,8 @@ __pycache__/
 # Runtime agent state and logs
 state/
 outputs/*.jsonl
+# R session history
+.Rhistory
+
+# R session history
+.Rhistory
