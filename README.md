@@ -126,7 +126,7 @@ Instamart-Customer-Intelligence-Copilot/
 └── README.md
 ```
 
-Additional temporary and runtime files may be generated during execution. The project structure above describes the principal source files and deliverables.
+Additional temporary and runtime files may be generated during execution. The structure above describes the principal project files and deliverables.
 
 ## 4. Setup and Reproduction
 
@@ -136,31 +136,33 @@ Additional temporary and runtime files may be generated during execution. The pr
 - Git
 - Visual Studio Code or another Python-compatible IDE
 
-### 4.2 Clone the repository
+### 4.2 Clone the Repository
 
 ```powershell
 git clone https://github.com/poojasanthoshkumar/Instamart-Customer-Intelligence-Copilot.git
-
 cd Instamart-Customer-Intelligence-Copilot
 ```
 
-### 4.3 Create and activate a virtual environment
+### 4.3 Create and Activate a Virtual Environment
 
 ```powershell
 python -m venv .venv
+```
 
+Activate the environment in Windows PowerShell:
+
+```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-### 4.4 Install dependencies
+### 4.4 Install Dependencies
 
 ```powershell
 python -m pip install --upgrade pip
-
 python -m pip install -r requirements.txt
 ```
 
-### 4.5 Generate the datasets
+### 4.5 Generate the Datasets
 
 ```powershell
 python generate_data.py
@@ -168,11 +170,11 @@ python generate_data.py
 
 This generates the synthetic customer, product, order, support-ticket, policy-evaluation, and agent-scenario datasets.
 
-### 4.6 Execute the project
+### 4.6 Execute the Project
 
 The four components should be executed in their respective workflow order.
 
-**Part A – Data Foundation**
+**Part A – Data Foundation and Analytics**
 
 ```powershell
 python clean_customers.py
@@ -218,6 +220,8 @@ python .\src\part_d\test_recovery.py
 
 For Part D, ensure that the SQLite database, policy documents, and evaluation datasets are available before execution.
 
+The evaluation scripts and recovery tests should be run after the relevant project components have been generated.
+
 ## 5. Part A – Data Foundation and Analytics
 
 ### 5.1 Data Cleaning
@@ -225,17 +229,20 @@ For Part D, ensure that the SQLite database, policy documents, and evaluation da
 The raw datasets were audited and cleaned to establish a consistent analytical foundation.
 
 **Customer data**
+
 - Standardised city names and gender values.
 - Identified invalid ages outside the 10–100 range.
 - Imputed missing ages using city-wise median values.
 - Converted signup dates into datetime format.
 
 **Product data**
+
 - Retained 40 product records.
 - Validated product identifiers and uniqueness.
 - Checked missing values and standardised product information.
 
 **Order data**
+
 - Converted order timestamps into datetime format.
 - Removed 119 exact duplicate records.
 - Retained the latest record for each order ID, producing 12,309 unique orders.
@@ -251,6 +258,7 @@ A SQLite database was constructed using the cleaned customer, product, and order
 Database: `data/instamart.db`
 
 Tables:
+
 - `customers`
 - `products`
 - `orders`
@@ -270,6 +278,7 @@ Tables:
 | Upper IQR outliers | 897 |
 
 Seven SQL queries were implemented to investigate:
+
 1. Customer spending.
 2. City-wise and category-wise revenue.
 3. Above-average product prices.
@@ -323,6 +332,7 @@ A four-cluster solution was selected.
 PCA was used for dimensionality reduction and visualisation. The first two components explained a combined 85.2% of the variance.
 
 Outputs:
+
 - `outputs/rfm_scaled.csv`
 - `outputs/customer_segments.csv`
 - `outputs/segment_profiles.csv`
@@ -347,6 +357,7 @@ A customer was labelled as lapsed if no completed order occurred during Septembe
 Historical features were constructed using data before the prediction cutoff to reduce temporal leakage.
 
 Features included:
+
 - Historical recency.
 - Purchase frequency.
 - Monetary value.
@@ -385,6 +396,7 @@ Oversampling improved recall and F1 while reducing precision, demonstrating the 
 Random Forest feature importance and Logistic Regression coefficients were exported for interpretation.
 
 The leading Random Forest features included:
+
 - Purchase frequency.
 - Monetary value.
 - Cancellation rate.
@@ -408,6 +420,7 @@ The Premium label is based on the complete RFM snapshot, whereas lapse predictio
 Part C implements an automated support-ticket processing workflow using the supplied deterministic mock language model.
 
 The pipeline classifies customer tickets into:
+
 - Billing.
 - Delivery.
 - Technical.
@@ -431,11 +444,13 @@ Empty and overlength tickets were handled before model invocation.
 ### 7.3 PII Masking
 
 The pipeline masks:
+
 - Email addresses.
 - Ten-digit Indian mobile numbers.
 - Order identifiers.
 
 Placeholders:
+
 - `[EMAIL]`
 - `[PHONE]`
 - `[ORDER_ID]`
@@ -485,6 +500,7 @@ The final permitted response could take total usage above the threshold because 
 The final routing pipeline used few-shot classification with a 100,000-token budget.
 
 Routing rules:
+
 1. Empty, overlength, invalid, and budget-exhausted tickets were assigned to human review.
 2. Fraud tickets were routed to the security team with high priority.
 3. Other validly classified tickets belonging to Premium customers were routed to the premium desk with high priority.
@@ -526,7 +542,7 @@ The generated knowledge base is saved as:
 
 `outputs/part_d/policy_chunks.json`
 
-The latest validated policy-processing run generated **17 policy chunks**.
+The latest recorded policy-processing run generated **17 policy chunks**.
 
 ### 8.3 TF-IDF Retrieval
 
@@ -566,7 +582,9 @@ Policy retrieval was evaluated using 14 predefined queries.
 
 All 14 predefined policy evaluation queries passed during the recorded evaluation run.
 
-Output: `outputs/part_d/policy_evaluation_results.csv`
+Output:
+
+`outputs/part_d/policy_evaluation_results.csv`
 
 This result applies to the selected evaluation queries and does not establish general retrieval performance for all possible customer questions.
 
@@ -590,7 +608,7 @@ Refund operations are simulated locally. No actual financial transaction or paym
 
 ### 8.7 Official Agent Evaluation
 
-The refund agent is evaluated against seven predefined scenarios.
+The refund agent is evaluated using seven predefined scenarios.
 
 The evaluation covers different order and refund situations, including eligibility checks and cases requiring rejection or escalation.
 
@@ -687,7 +705,7 @@ https://github.com/poojasanthoshkumar/Instamart-Customer-Intelligence-Copilot
 
 The repository contains the project source code, datasets, policy documents, analytical outputs, model artefacts, and evaluation scripts required to examine the four project components.
 
-**Project status:** The implementation and evaluation workflows have been developed and committed to the main branch. Final submission readiness should be confirmed against the assignment rubric and the committed repository contents.
+**Project status:** The implementation and evaluation workflows have been developed and committed to the `main` branch. Final submission readiness should be confirmed against the assignment rubric and the committed repository contents.
 
 ---
 
