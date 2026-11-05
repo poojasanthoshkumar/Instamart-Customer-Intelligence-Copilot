@@ -71,7 +71,8 @@ Instamart_Copilot/
 │       ├── policy_processor.py
 │       ├── policy_retriever.py
 │       ├── rag_pipeline.py
-│       └── refund_agent.py
+│       ├── refund_agent.py
+│       └── test_recovery.py
 │
 ├── outputs/
 │   ├── rfm_table.csv
@@ -92,6 +93,7 @@ Instamart_Copilot/
 │   ├── triage_few_shot.csv
 │   ├── triage_budget_demo.csv
 │   ├── triage_input_audit.csv
+│   │
 │   └── part_d/
 │       ├── policy_chunks.json
 │       ├── policy_evaluation_results.csv
@@ -169,7 +171,7 @@ The supplied data-generation script creates the synthetic customer, product, ord
 
 The supplied `generate_data.py` and `mock_llm.py` files are retained unchanged.
 
-### 4.5 Data cleaning and database construction
+### 4.5 Data Cleaning and Database Construction
 
 Run the cleaning scripts from the project root in the following order.
 
@@ -324,7 +326,7 @@ Evaluates the effect of oversampling on model performance and compares the resul
 
 Oversampling is restricted to training data to avoid introducing synthetic observations into the test set.
 
-**Step 7: Finalize model verification and retention prioritisation**
+**Step 7: Finalise model verification and retention prioritisation**
 
 ```powershell
 python finalize_lapse_outputs.py
@@ -452,6 +454,31 @@ Output:
 
 The Part D workflow uses a simulated refund-processing environment. It does not initiate actual financial transactions.
 
+**Step 6: Validate crash recovery and safety limits**
+
+```powershell
+python .\src\part_d\test_recovery.py
+```
+
+Runs isolated recovery and fault-tolerance tests for the refund-support agent.
+
+The recovery test validates:
+
+- Simulated interruption immediately after refund processing.
+- Checkpoint creation before interruption.
+- Successful resumption of the interrupted agent run.
+- Prevention of duplicate refund ledger entries when resuming the same run.
+- Safe handling of an already completed run.
+- Timeout fallback.
+- Maximum model-call iteration fallback.
+- Token-budget fallback.
+
+The crash-recovery test verifies that the agent can resume from its saved checkpoint and complete the refund workflow without recording the same refund twice.
+
+All five recovery test categories passed during validation. The recovery tests use a temporary directory for runtime records and automatically remove the temporary test files after execution.
+
+These recovery tests are separate from the seven predefined official agent evaluation scenarios.
+
 ### 4.10 Runtime Files and Reproducibility
 
 The project generates certain runtime records during agent execution, including:
@@ -461,6 +488,8 @@ The project generates certain runtime records during agent execution, including:
 - Persistent agent checkpoint files.
 
 These files are runtime artefacts rather than required analytical result tables. They are excluded from version control through `.gitignore` to avoid committing unnecessary execution state.
+
+The recovery test redirects runtime paths to temporary storage, ensuring that its simulated refund transactions do not modify the existing project refund ledger or checkpoint files.
 
 The committed analytical outputs, policy-processing results, evaluation reports, and model artefacts provide reference results for the project.
 
@@ -737,7 +766,28 @@ Output:
 
 `outputs/part_d/agent_evaluation_results.csv`
 
-### 8.6 Part D Reproducibility
+### 8.6 Crash Recovery and Fault Tolerance
+
+An additional isolated recovery-testing script validates the agent's ability to recover from interrupted execution.
+
+The test simulates a crash immediately after the refund tool has processed a simulated transaction and saved its checkpoint.
+
+The same run is then resumed using the saved checkpoint. The test verifies successful completion and ensures that the refund ledger does not contain duplicate entries for the same run and order.
+
+Additional checks cover:
+
+- Resumption of an already completed run.
+- Timeout handling.
+- Maximum model-call limit.
+- Token-budget limit.
+
+All five recovery test categories passed during the recorded validation run.
+
+The recovery tests use temporary storage and do not modify the existing project refund ledger, agent execution logs, or persistent checkpoints.
+
+This validates checkpoint-based recovery and duplicate prevention within a resumed run. It does not establish exactly-once transaction guarantees across separate runs or interruptions during an incomplete file write.
+
+### 8.7 Part D Reproducibility
 
 The Part D workflow uses:
 
@@ -746,6 +796,8 @@ The Part D workflow uses:
 - TF-IDF and cosine similarity for retrieval.
 - The supplied mock language model for response generation.
 - Local runtime records for simulated agent execution.
+- Checkpoint files for interrupted-run recovery.
+- Isolated temporary storage for recovery testing.
 
 The workflow is designed to demonstrate an offline policy-grounded customer-support system without requiring an external commercial language-model API.
 
@@ -757,12 +809,13 @@ The workflow is designed to demonstrate an offline policy-grounded customer-supp
 - The ticket-classification and response-generation workflow uses the supplied mock language model.
 - Policy retrieval performance depends on the quality and wording of the available policy documents and customer queries.
 - Refund processing is simulated and does not interact with an actual payment gateway or financial system.
+- Checkpoint-based recovery protects against repeated processing within the same resumed run, but does not provide distributed transaction guarantees or cross-run financial idempotency.
 
 ## 10. Conclusion
 
 The Instamart Customer Intelligence & Support Copilot integrates data engineering, database analytics, machine learning, customer segmentation, support-ticket triage, and policy-grounded automation into a unified project.
 
-Part A establishes a validated data foundation and analytical database. Part B applies customer analytics and predictive modelling to identify purchasing patterns and prioritise retention opportunities. Part C demonstrates structured and privacy-conscious support-ticket processing. Part D integrates policy retrieval with a simulated refund-support agent.
+Part A establishes a validated data foundation and analytical database. Part B applies customer analytics and predictive modelling to identify purchasing patterns and prioritise retention opportunities. Part C demonstrates structured and privacy-conscious support-ticket processing. Part D integrates policy retrieval with a simulated refund-support agent and checkpoint-based recovery.
 
 Together, these components demonstrate how data analytics and machine-learning techniques can support customer intelligence, operational decision-making, and automated customer-support workflows in an online grocery delivery environment.
 
